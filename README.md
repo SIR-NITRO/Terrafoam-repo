@@ -2,6 +2,45 @@ provider "aws" {
   region = "us-east-1"
 }
 
+# Backend S3 bucket
+resource "aws_s3_bucket" "tf_state" {
+  bucket = "your-unique-tf-state-bucket"  # Must be globally unique
+
+  versioning {
+    enabled = true
+  }
+
+  server_side_encryption_configuration {
+    rule {
+      apply_server_side_encryption_by_default {
+        sse_algorithm = "AES256"
+      }
+    }
+  }
+
+  tags = {
+    Name = "Terraform State Bucket"
+  }
+}
+
+# DynamoDB table for state locking
+resource "aws_dynamodb_table" "tf_lock" {
+  name         = "terraform-lock-table"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "LockID"
+
+  attribute {
+    name = "LockID"
+    type = "S"
+  }
+
+  tags = {
+    Name = "Terraform Lock Table"
+  }
+}
+
+# Infrastructure: VPC, subnet, IGW, route table, security group, EC2
+
 resource "aws_vpc" "demotf_vpc" {
   cidr_block = "10.0.0.0/16"
   tags = {
@@ -42,6 +81,7 @@ resource "aws_security_group" "demotf_security_group" {
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
+
   ingress {
     from_port   = 80
     to_port     = 80
@@ -49,22 +89,23 @@ resource "aws_security_group" "demotf_security_group" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 }
+
 variable "instance_keypair" {
   description = "AWS EC2 key pair for ssh access"
-  type = string
-  default ="niyikp"
-  sensitive = true
+  type        = string
+  default     = "my-kp"
+  sensitive   = true
 }
 
 resource "aws_instance" "demo_instance" {
-  ami           = "ami-06e46074ae430fba6"
-  instance_type = "t2.micro"
-  subnet_id     = aws_subnet.demotf_subnet.id
-  key_name = var.instance_keypair
-  vpc_security_group_ids = [aws_security_group.demotf_security_group.id]
+  ami                         = "ami-06e46074ae430fba6"
+  instance_type               = "t2.micro"
+  subnet_id                   = aws_subnet.demotf_subnet.id
+  key_name                    = var.instance_keypair
+  vpc_security_group_ids      = [aws_security_group.demotf_security_group.id]
   associate_public_ip_address = true
 
   tags = {
-    Name = "niyi-instance"
+    Name = "Emma-instance"
   }
 }
